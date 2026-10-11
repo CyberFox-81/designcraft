@@ -56,6 +56,10 @@ pub fn start() {
         {
             create.instance_descriptor.backends = eframe::wgpu::Backends::GL;
         }
+        // `?host=parent`: a same-origin page framing DesignCraft (such as a Nextcloud app) opens
+        // documents in it and stores what it saves (`host`).
+        let bridge = if query_param("host").as_deref() == Some("parent") { crate::host::Bridge::new() } else { None };
+        let app_bridge = bridge.clone();
         let runner = eframe::WebRunner::new();
         let creator_graphics = graphics.clone();
         let result = runner
@@ -72,14 +76,24 @@ pub fn start() {
                         });
                     }
                     let inbox: Inbox = Inbox::default();
-                    let mut app = DesignApp::new(Session::new(), services(inbox.clone(), cc.egui_ctx.clone()));
-                    if has_query_flag(&query(), "sample") {
+                    let mut services = services(inbox.clone(), cc.egui_ctx.clone());
+                    if let Some(bridge) = &app_bridge {
+                        bridge.connect(&mut services, inbox.clone(), cc.egui_ctx.clone());
+                    }
+                    let mut app = DesignApp::new(Session::new(), services);
+                    if let Some(bridge) = &app_bridge {
+                        // The parent sends the document to edit; no sample meanwhile.
+                        bridge.post_ready();
+                    } else if has_query_flag(&query(), "sample") {
                         let _ = app.run("file.newSample", serde_json::json!({}));
                     }
-                    Ok(Box::new(WebShell { app, inbox, graphics: creator_graphics }))
+                    Ok(Box::new(WebShell { app, inbox, graphics: creator_graphics, bridge: app_bridge }))
                 }),
             )
             .await;
+        if let (Err(e), Some(bridge)) = (&result, &bridge) {
+            bridge.post_failed(&format!("{e:?}"));
+        }
         match result {
             Ok(()) => {
                 if let Err(e) = install_recovery_controls(&runner, &canvas, &graphics) {
@@ -339,12 +353,20 @@ fn query() -> String {
     web_sys::window().and_then(|w| w.location().search().ok()).unwrap_or_default()
 }
 
+/// The decoded value of query parameter `key`.
+fn query_param(key: &str) -> Option<String> {
+    let query = query();
+    let query = query.strip_prefix('?').unwrap_or(&query);
+    form_urlencoded::parse(query.as_bytes()).find(|(k, _)| k == key).map(|(_, v)| v.into_owned())
+}
+
 /// Wraps the app to read dropped files asynchronously (browsers can't read them synchronously)
 /// and feed them through the inbox.
 struct WebShell {
     app: DesignApp,
     inbox: Inbox,
     graphics: GraphicsState,
+    bridge: Option<crate::host::Bridge>,
 }
 
 impl eframe::App for WebShell {
@@ -379,6 +401,9 @@ impl eframe::App for WebShell {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let _ = self.graphics.run_if_healthy(|| self.app.ui(ui));
+        if let Some(bridge) = &self.bridge {
+            bridge.sync(&self.app);
+        }
     }
 
     fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
