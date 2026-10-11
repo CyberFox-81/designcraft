@@ -15,6 +15,7 @@ pub const BRAND: Color32 = Color32::from_rgb(0x4e, 0x7b, 0xfb);
 pub const DISCORD: Color32 = Color32::from_rgb(0x58, 0x65, 0xf2);
 
 /// The ArtCraft mark outline (viewBox -10 -19.42 136.34 136.34), from `docs/brand/artcraft-mark.svg`.
+#[cfg(not(feature = "unbranded"))]
 const MARK_PATH: &str = "M104.28,49.49L81.55,0h-31.23l-3.17,4.76L14.75,53.63,0,75.85l21.55,21.55,63.79-36.94,16.99,37.04,14.01-21.74-12.06-26.27ZM32.89,65.66l32.42-48.87,10.91,23.77-43.32,25.09Z";
 
 /// The other ArtCraft apps (app-page slug, name, what it is) — same list as the README.
@@ -30,7 +31,13 @@ pub const SIBLINGS: &[(&str, &str, &str)] = &[
 /// The About window's tabs, in `UiState::about_tab` order (`help.about {tab}` names them in lowercase).
 pub const ABOUT_TABS: [&str; 3] = ["About", "Contributors", "Models"];
 
+/// Unbranded builds (the `unbranded` feature) paint no mark: modified builds must not carry the
+/// ArtCraft marks (`docs/brand/LICENSE-brand.txt`).
+#[cfg(feature = "unbranded")]
+pub fn paint_mark(_ui: &egui::Ui, _rect: Rect, _color: Color32) {}
+
 /// Paint the ArtCraft mark into `rect` (square), rasterised once per size and cached.
+#[cfg(not(feature = "unbranded"))]
 pub fn paint_mark(ui: &egui::Ui, rect: Rect, color: Color32) {
     use designcraft_render::vello_cpu::{self, kurbo, peniko};
     let ctx = ui.ctx();

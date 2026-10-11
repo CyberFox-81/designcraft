@@ -14,6 +14,10 @@ workspace = true
 name = "designcraft-web"
 path = "src/main.rs"
 
+[features]
+# See designcraft-ui-egui's `unbranded`: for redistributed modified builds.
+unbranded = ["designcraft-ui-egui/unbranded"]
+
 [dependencies]
 designcraft-engine = { workspace = true }
 designcraft-format = { workspace = true }

@@ -49,3 +49,8 @@ toml = "1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 craft-update = { workspace = true }
+
+[features]
+# Leave out the ArtCraft mark (docs/brand/), which modified builds must not carry
+# (docs/brand/LICENSE-brand.txt).
+unbranded = []
