@@ -48,10 +48,9 @@ impl Bridge {
     pub fn connect(&self, services: &mut Services, inbox: Inbox, ctx: egui::Context) {
         self.listen(inbox, ctx);
         let bridge = self.clone();
+        // An error fails the save or export, as a refused download does.
         services.download = Some(Box::new(move |name: &str, bytes: &[u8]| {
-            if let Err(e) = bridge.post_save(name, bytes) {
-                log::error!("couldn't hand {name} to the page: {e}");
-            }
+            bridge.post_save(name, bytes).map_err(|e| format!("couldn't hand {name} to the page: {e}"))
         }));
         let bridge = self.clone();
         services.write = Some(Box::new(move |name: &str, bytes: &[u8]| bridge.post_save(name, bytes)));
